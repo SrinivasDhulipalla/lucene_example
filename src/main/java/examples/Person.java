@@ -7,7 +7,6 @@ public class Person implements Serializable {
   private String email;
   private int revenue;
   private String address;
-  private Page homepage;
 
   public Person() {}
 
@@ -15,7 +14,6 @@ public class Person implements Serializable {
     this.name = name;
     this.email = email;
     this.address = address;
-    this.homepage = new Page(name);
   }
   
   public Person(int idx) {
@@ -23,7 +21,6 @@ public class Person implements Serializable {
     this.email = "tzhou"+idx+"@example.com";
     this.address = ""+idx+" Lindon St, Portland_OR_"+(97000+idx);
     this.revenue = idx*1000;
-    this.homepage = new Page(idx);
   }
 
   static String createName(int idx) {
@@ -49,7 +46,6 @@ public class Person implements Serializable {
     sb.append(", email='").append(email).append('\'');
     sb.append(", address='").append(address).append('\'');
     sb.append(", revenue='").append(revenue).append('\'');
-    sb.append(", homepage='").append(homepage).append('\'');
     sb.append('}');
     return sb.toString();
   }

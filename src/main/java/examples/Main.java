@@ -22,9 +22,6 @@ import org.apache.lucene.analysis.core.LowerCaseFilter;
 import org.apache.lucene.analysis.util.CharTokenizer;
 import org.apache.lucene.queryparser.classic.ParseException;
 
-import loader.Loader;
-import objectsize.ObjectSizer;
-
 import org.apache.geode.cache.Cache;
 import org.apache.geode.cache.CacheFactory;
 import org.apache.geode.cache.DataPolicy;
@@ -49,14 +46,8 @@ import org.apache.geode.cache.lucene.LuceneResultStruct;
 import org.apache.geode.cache.lucene.LuceneService;
 import org.apache.geode.cache.lucene.LuceneServiceProvider;
 import org.apache.geode.cache.lucene.PageableLuceneQueryResults;
-import org.apache.geode.cache.lucene.internal.LuceneIndexForPartitionedRegion;
-import org.apache.geode.cache.lucene.internal.LuceneIndexImpl;
-import org.apache.geode.cache.lucene.internal.LuceneServiceImpl;
 import org.apache.geode.distributed.ServerLauncher;
 import org.apache.geode.distributed.ServerLauncher.Builder;
-import org.apache.geode.internal.DSFIDFactory;
-import org.apache.geode.internal.cache.PartitionedRegion;
-import org.apache.geode.internal.logging.LogService;
 import org.apache.geode.pdx.JSONFormatter;
 import org.apache.geode.pdx.PdxInstance;
 
@@ -64,26 +55,17 @@ public class Main {
   ServerLauncher serverLauncher;
   GemFireCache cache;
   Region PersonRegion;
-  Region CustomerRegion;
-  Region PageRegion;
-  LuceneServiceImpl service;
+  LuceneService service;
   static int serverPort = 50505;
   static boolean useLocator = false;
 
   final static int ENTRY_COUNT = 1000;
-  final static Logger logger = LogService.getLogger();
 
   final static int SERVER_WITH_FEEDER = 1;
   final static int SERVER_ONLY = 2;
   final static int CLIENT = 3;
   final static int SERVER_WITH_CLUSTER_CONFIG = 4;
-  final static int CALCULATE_SIZE = 5;
-  final static int LOAD_USER_DATA = 6;
-  static int instanceType = CALCULATE_SIZE;
-  
-  private static String FILE_LOCATION = "./311-sample.csv";
-  Region ServiceRequestRegion;
-  Loader loader;
+  static int instanceType = SERVER_WITH_FEEDER;
   
   /* Usage: ~ [1|2|3|4 [isUsingLocator]]
    * 1: server with feeder
@@ -99,9 +81,6 @@ public class Main {
       }
       if (args.length > 1) {
         useLocator = Boolean.valueOf(args[1]);
-      }
-      if (args.length > 2) {
-        FILE_LOCATION = args[2];
       }
       serverPort += instanceType;
       
@@ -124,8 +103,6 @@ public class Main {
           prog.feed(ENTRY_COUNT);
           prog.waitUntilFlushed("personIndex", "Person");
           prog.waitUntilFlushed("analyzerIndex", "Person");
-          prog.waitUntilFlushed("customerIndex", "Customer");
-          prog.waitUntilFlushed("pageIndex", "Page");
 
           prog.doQuery();
           break;
@@ -140,8 +117,6 @@ public class Main {
           prog.feed(ENTRY_COUNT);
           prog.waitUntilFlushed("personIndex", "Person");
           prog.waitUntilFlushed("analyzerIndex", "Person");
-          prog.waitUntilFlushed("customerIndex", "Customer");
-          prog.waitUntilFlushed("pageIndex", "Page");
           
           prog.doQuery();
           break;
@@ -150,28 +125,6 @@ public class Main {
           // create cache, create index, create region
           prog.createCache(serverPort);
           prog.createIndexAndRegions(RegionShortcut.PARTITION_REDUNDANT_PERSISTENT);
-          break;
-          
-        case CALCULATE_SIZE:
-          prog.createCache(serverPort);
-          prog.createIndexAndRegions(RegionShortcut.PARTITION_REDUNDANT_PERSISTENT);        
-
-          long then = System.currentTimeMillis();
-          prog.feed(ENTRY_COUNT);
-          prog.waitUntilFlushed("personIndex", "Person");
-          System.out.println("Total wait time is:"+(System.currentTimeMillis() - then));
-          
-          // calculate region size
-          prog.calculateSize("personIndex", "Person");
-          prog.doDump("personIndex", "Person");
-          break;
-
-        case LOAD_USER_DATA:
-          prog.createCache(serverPort);
-          prog.createIndexAndRegionForServiceRequest(RegionShortcut.PARTITION_REDUNDANT_PERSISTENT);   
-          prog.waitUntilFlushed("serviceRequestIndex", "ServiceRequest");
-
-          prog.doQueryServiceRequest();
           break;
       }
       
@@ -189,10 +142,8 @@ public class Main {
     cache = cf.setPdxReadSerialized(true).create();
     ClientRegionFactory crf = ((ClientCache)cache).createClientRegionFactory(ClientRegionShortcut.CACHING_PROXY);
     PersonRegion = crf.create("Person");
-    CustomerRegion = crf.create("Customer");
-    PageRegion = crf.create("Page");
     
-    service = (LuceneServiceImpl) LuceneServiceProvider.get(cache);
+    service = LuceneServiceProvider.get(cache);
   }
   
   private void createCache(int port) {
@@ -213,12 +164,6 @@ public class Main {
     //        .set("log-level", "debug")
     ;
 
-    if (instanceType != CLIENT) {
-      builder.set("start-dev-rest-api", "true")
-      .set("http-service-port","808"+instanceType)
-      .set("http-service-bind-address", "localhost");
-    }
-        
     if (useLocator && instanceType != CLIENT) {
       builder.set("locators", "localhost[12345]");
     }
@@ -233,13 +178,11 @@ public class Main {
     for (String s:registeredFunctions.keySet()) {
       System.out.println("registered function:"+s);
     }
-    service = (LuceneServiceImpl) LuceneServiceProvider.get(cache);
+    service = LuceneServiceProvider.get(cache);
   }
 
   private void getRegions() {
     PersonRegion = cache.getRegion("/Person");
-    CustomerRegion = cache.getRegion("/Customer");
-    PageRegion = cache.getRegion("/Page");
   }
   
   private void stopServer() {
@@ -251,56 +194,15 @@ public class Main {
   }
 
   private void createIndexAndRegions(RegionShortcut shortcut) {
-    if (instanceType != CALCULATE_SIZE) {
-      // create an index using several analyzers on region /Person
-      Map<String, Analyzer> fields = new HashMap<String, Analyzer>();
-      fields.put("name",  new DoubleMetaphoneAnalyzer());
-      fields.put("email", new KeywordAnalyzer());
-      fields.put("address", new MyCharacterAnalyzer());
-      service.createIndex("analyzerIndex", "Person", fields);
-    }
+    // create an index using several analyzers on region /Person
+    Map<String, Analyzer> fields = new HashMap<String, Analyzer>();
+    fields.put("name",  new DoubleMetaphoneAnalyzer());
+    fields.put("email", new KeywordAnalyzer());
+    service.createIndexFactory().setFields(fields).create("analyzerIndex", "Person");
 
     // create an index using standard analyzer on region /Person
     service.createIndexFactory().setFields("name", "email", "address", "revenue").create("personIndex", "Person");
     PersonRegion = ((Cache)cache).createRegionFactory(shortcut).create("Person");
-
-    if (instanceType != CALCULATE_SIZE) {
-      // create an index using standard analyzer on region /Customer
-      service.createIndexFactory().addField("name").addField("symbol").addField("revenue").addField("SSN")
-      .addField("contact.name").addField("contact.email").addField("contact.address").addField("contact.homepage.title")
-      .addField(LuceneService.REGION_VALUE_FIELD)
-      .create("customerIndex", "Customer");
-      CustomerRegion = ((Cache)cache).createRegionFactory(shortcut).create("Customer");
-
-      // create an index using standard analyzer on region /Page
-      service.createIndexFactory().setFields("id", "title", "content").create("pageIndex", "Page");
-      PageRegion = ((Cache)cache).createRegionFactory(shortcut).create("Page");
-    }
-  }
-
-  private void createIndexAndRegionForServiceRequest(RegionShortcut shortcut) throws FileNotFoundException, java.text.ParseException {
-    service.createIndexFactory().addField("uniqueKey").addField("createdDate")
-    .addField("closedDate").addField("agency").addField("agencyName").addField("complaintType")
-    .addField("descriptor").addField("locationType").addField("incidentZip").addField("incidentAddress")
-    .addField("streetName").addField("crossStreet_1").addField("crossStreet_2").addField("intersectionStreet_1")
-    .addField("intersectionStreet_2").addField("addressType").addField("city").addField("landmark")
-    .addField("facilityType").addField("status").addField("dueDate").addField("resolutionDescription")
-    .addField("resolutionActionUpdateDate").addField("communityBoard").addField("borough")
-    .addField("x_coordinate").addField("y_coordinate").addField("parkFacilityName")
-    .addField("parkBorough").addField("schoolName").addField("schoolNumber").addField("schoolRegion")
-    .addField("schoolCode").addField("schoolPhoneNumber").addField("schoolAddress")
-    .addField("schoolCity").addField("schoolState").addField("schoolZip").addField("schoolNotFound")
-    .addField("schoolOrCityWideComplaint").addField("vehicleType").addField("taxiCompanyBorough")
-    .addField("taxiPickUpLocation").addField("bridgeHighwayName").addField("bridgeHighwayDirection")
-    .addField("roadRamp").addField("bridgeHighwaySegment").addField("garageLotName").addField("ferryDirection")
-    .addField("ferryTerminalName").addField("latitude").addField("longitude").addField("location")
-    .create("serviceRequestIndex", "ServiceRequest");
-    ServiceRequestRegion = ((Cache)cache).createRegionFactory(shortcut).create("ServiceRequest");
-    loader = new Loader(FILE_LOCATION, ServiceRequestRegion);
-  }
-  
-  public void doQueryServiceRequest() throws LuceneQueryException {
-    queryByStringQueryParser("serviceRequestIndex", "ServiceRequest", "agencyName:Police", 10);
   }
 
   public void doQuery() throws LuceneQueryException {
@@ -324,34 +226,9 @@ public class Main {
     System.out.println("\nQuery with composite condition");
     queryByStringQueryParser("analyzerIndex", "Person", "name:Tom999* OR address:97763", 0);
 
-    System.out.println("\nsearch region Customer for symbol 123 and 456");
-    queryByStringQueryParser("customerIndex", "Customer", "symbol:123", 0);
-    queryByStringQueryParser("customerIndex", "Customer", "symbol:456", 0);
-    
-    queryByStringQueryParser("customerIndex", "Customer", "symbol:99*", 0);
-    queryByIntRange("pageIndex", "Page", "id", 100, 102);
-
     System.out.println("\nExamples of QueryProvider");
-    queryByIntRange("customerIndex", "Customer", "SSN", 995, Integer.MAX_VALUE);
+    queryByIntRange("personIndex", "Person", "revenue", 995, Integer.MAX_VALUE);
     
-    System.out.println("\nExamples of ToParentBlockJoin query provider");
-    queryByJoinQuery("customerIndex", "Customer", "symbol", "*", "email:tzhou11*", "email");
-
-    queryByGrandChildJoinQuery("customerIndex", "Customer", "symbol", "name", "title", "email:tzhou12*", "PivotalPage123*");
-
-    // cross regions:
-    // query analyzerIndex to find a Person with address:97763, then use Person's name to find the Customer
-    HashSet persons = queryByStringQueryParser("analyzerIndex", "Person", "address:97763", 0);
-    for (Object value:persons) {
-      if (value instanceof Person) {
-        Person person = (Person)value;
-        HashSet customers = queryByStringQueryParser("customerIndex", "Customer", "\""+person.getName()+"\"", 0);
-        for (Object c:customers) {
-          System.out.println("Found a customer:"+c);
-        }
-      }
-    }
-
     System.out.println("Regular query on soundex analyzer: double metaphone");
     insertSoundexNames(PersonRegion);
     try {
@@ -376,22 +253,6 @@ public class Main {
     ResultCollector<?,?> rc = execution.execute("LuceneSearchIndexFunction");
     displayResults(rc);
     
-    {
-      String parametersForREST = "personIndex,Person,name:Tom99*,name,-1,false";
-      System.out.println("Paramter is: "+parametersForREST);
-      execution = FunctionService.onServer(pool).withArgs(parametersForREST);
-      rc = execution.execute("LuceneSearchIndexFunction");
-      displayResults(rc);
-    }
-
-    {
-      String parametersForREST = "personIndex,Person,name:Tom99*,name,-1,true";
-      System.out.println(parametersForREST);
-      execution = FunctionService.onServer(pool).withArgs(parametersForREST);
-      rc = execution.execute("LuceneSearchIndexFunction");
-      displayResults(rc);
-    }
-
     queryInfo = new LuceneQueryInfo("analyzerIndex", "/Person", "address:97763", "name", -1, false);
     execution = FunctionService.onServer(pool).withArgs(queryInfo);
     rc = execution.execute("LuceneSearchIndexFunction");
@@ -399,9 +260,6 @@ public class Main {
   }
   
   private void displayResults(ResultCollector<?,?> rc) {
-//    List<Set<LuceneSearchResults>> functionResults = (List<Set<LuceneSearchResults>>) rc.getResult();
-//    List<LuceneSearchResults> results = functionResults.stream().flatMap(set -> set.stream()).sorted()
-//        .collect(Collectors.toList());
     ArrayList functionResults = (ArrayList)((ArrayList)rc.getResult()).get(0);
     
     System.out.println("\nClient Function found "+functionResults.size()+" results");
@@ -411,7 +269,7 @@ public class Main {
   }
   
   private void waitUntilFlushed(String indexName, String regionName) throws InterruptedException {
-    LuceneIndexImpl index = (LuceneIndexImpl)service.getIndex(indexName, regionName);
+    LuceneIndex index = service.getIndex(indexName, regionName);
     if (index == null) {
       // it's a client
       return;
@@ -424,56 +282,11 @@ public class Main {
     System.out.println("wait time after feed is:"+(System.currentTimeMillis() - then));
   }
 
-//  private void defineIndexAndRegion(String indexName, String regionName, RegionShortcut regionType, String...fields) {
-//    service.createIndex(indexName, regionName, fields);
-//  }
-//
-//  private Region createRegion(String regionName, RegionShortcut regionType) {
-//    RegionFactory<Object, Object> regionFactory = ((Cache)cache).createRegionFactory(regionType);
-//    return regionFactory.create(regionName);
-//  }
-  
-  private void calculateSize(String indexName, String regionName) {
-    LuceneIndexForPartitionedRegion index = (LuceneIndexForPartitionedRegion)service.getIndex(indexName, regionName);
-    Region region = cache.getRegion(regionName);
-    if (region == null) {
-      return;
-    }
-    long dataRegionSize = ObjectSizer.calculateSize(region, false);
-    System.out.println("Region "+PersonRegion.getFullPath()+" has "+ENTRY_COUNT
-        + " entries, size is "+dataRegionSize/1000+"KB");
- 
-    if (index != null) {
-      PartitionedRegion indexPr = index.getFileAndChunkRegion();
-      long indexRegionSize = ObjectSizer.calculateSize(region, false);
-      System.out.println("index size is "+indexRegionSize/1000+"KB");
-    }
-  }
-  
-  private void doDump(String indexName, String regionName) {
-    LuceneIndexForPartitionedRegion index = (LuceneIndexForPartitionedRegion)service.getIndex(indexName, regionName);
-    if (index == null) {
-      return;
-    }
-    index.dumpFiles("dump"+indexName);
-  }
-
   private void feed(int count) {
     for (int i=0; i<count; i++) {
       PersonRegion.put("key"+i, new Person(i));
     }
-    
-    if (instanceType != CALCULATE_SIZE) {
-      for (int i=0; i<count; i++) {
-        CustomerRegion.put("key"+i, new Customer(i));
-      }
-      for (int i=0; i<count; i++) {
-        PageRegion.put("key"+i, new Page(i));
-      }
-
-      insertAJson(PersonRegion);
-      insertNestObjects(CustomerRegion);
-    }
+    insertAJson(PersonRegion);
   }
 
   private void insertSoundexNames(Region region) {
@@ -486,20 +299,8 @@ public class Main {
     region.put("soundex7", new Person("Stuffin", "a@b.com", "address1"));
   }
   
-  private void insertPrimitiveTypeValue(Region region) {
-    region.put("primitiveInt1", 123);
-    region.put("primitiveInt2", "223");
-  }
-
-  private void insertNestObjects(Region region) {
-    Customer customer123 = new Customer(123);
-    Customer customer456 = new Customer(456);
-    region.put("customer123", customer123);
-    region.put("customer456", customer456);
-  }
-
   private void insertAJson(Region region) {
-    String jsonCustomer = "{"
+    String jsonPerson1 = "{"
         + "\"name\": \"Tom9_JSON\","
         + "\"lastName\": \"Smith\","
         + " \"age\": 25,"
@@ -524,12 +325,12 @@ public class Main {
         + "]"
         + "}";
 
-    region.put("jsondoc1", JSONFormatter.fromJSON(jsonCustomer));
-    System.out.println("JSON documents added into Cache: " + jsonCustomer);
+    region.put("jsondoc1", JSONFormatter.fromJSON(jsonPerson1));
+    System.out.println("JSON documents added into Cache: " + jsonPerson1);
     System.out.println(region.get("jsondoc1"));
     System.out.println();
 
-    String jsonCustomer2 = "{"
+    String jsonPerson2 = "{"
         + "\"name\": \"Tom99_JSON\","
         + "\"lastName\": \"Smith\","
         + " \"age\": 25,"
@@ -553,8 +354,8 @@ public class Main {
         + "}"
         + "]"
         + "}";
-    region.put("jsondoc2", JSONFormatter.fromJSON(jsonCustomer2));
-    System.out.println("JSON documents added into Cache: " + jsonCustomer2);
+    region.put("jsondoc2", JSONFormatter.fromJSON(jsonPerson2));
+    System.out.println("JSON documents added into Cache: " + jsonPerson2);
     System.out.println(region.get("jsondoc2"));
     System.out.println();
   }
@@ -620,19 +421,5 @@ public class Main {
     LuceneQuery query = service.createLuceneQueryFactory().create(indexName, regionName, provider);
 
     getResults(query, regionName);
-  }
-  
-  private HashSet queryByJoinQuery(String indexName, String regionName, String parentField, String parentFilter, String childQueryString, String childField) throws LuceneQueryException {
-    ToParentBlockJoinQueryProvider provider = new ToParentBlockJoinQueryProvider(parentField, parentFilter, childQueryString, childField);
-    LuceneQuery query = service.createLuceneQueryFactory().create(indexName, regionName, provider);
-
-    return getResults(query, regionName);
-  }
-  
-  private HashSet queryByGrandChildJoinQuery(String indexName, String regionName, String parentDefaultField, String childDefaultField, String grandChildDefaultField, String queryOnChild, String queryOnGrandChild) throws LuceneQueryException {
-    ToGrandParentBlockJoinQueryProvider provider = new ToGrandParentBlockJoinQueryProvider(parentDefaultField, childDefaultField, grandChildDefaultField, queryOnChild, queryOnGrandChild);
-    LuceneQuery query = service.createLuceneQueryFactory().create(indexName, regionName, provider);
-
-    return getResults(query, regionName);
   }
 }

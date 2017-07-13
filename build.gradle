@@ -45,14 +45,6 @@ repositories {
 
 // In this section you declare the dependencies for your production and test code
 dependencies {
-    // If using release verson in maven (geode 1.0.0)
-    // compile "org.apache.geode:geode-core:1.0.0-incubating"
-    // compile "org.apache.geode:geode-lucene:1.0.0-incubating"
-
-    // If using support version (gemfire 9.0.1)
-    // compile "io.pivotal.gemfire:geode-core:9.1.0"
-    // compile "io.pivotal.gemfire:geode-lucene:9.1.0"
-
     // If using develop version (geode 1.2.0)
     compile "org.apache.geode:geode-core:1.2.0-SNAPSHOT"
     compile "org.apache.geode:geode-lucene:1.2.0-SNAPSHOT"
@@ -69,10 +61,6 @@ dependencies {
     compile "org.eclipse.jetty:jetty-security:9.3.6.v20151106"
     compile "org.eclipse.jetty:jetty-xml:9.3.6.v20151106"
     compile "org.eclipse.jetty:jetty-servlet:9.3.6.v20151106"
-
-    // for nested object
-    compile "org.apache.lucene:lucene-join:6.4.1"
-    compile "org.apache.lucene:lucene-grouping:6.4.1"
 
     // for soundex analyzer
     compile "org.apache.lucene:lucene-analyzers-phonetic:6.4.1"
