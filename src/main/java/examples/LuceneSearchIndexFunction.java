@@ -8,7 +8,7 @@ import java.util.Set;
 
 import org.apache.geode.cache.Cache;
 import org.apache.geode.cache.CacheFactory;
-import org.apache.geode.cache.execute.FunctionAdapter;
+import org.apache.geode.cache.execute.Function;
 import org.apache.geode.cache.execute.FunctionContext;
 import org.apache.geode.cache.lucene.LuceneIndex;
 import org.apache.geode.cache.lucene.LuceneQuery;
@@ -17,8 +17,6 @@ import org.apache.geode.cache.lucene.LuceneResultStruct;
 import org.apache.geode.cache.lucene.LuceneService;
 import org.apache.geode.cache.lucene.LuceneServiceProvider;
 import org.apache.geode.cache.lucene.PageableLuceneQueryResults;
-import org.apache.geode.cache.lucene.internal.LuceneIndexImpl;
-import org.apache.geode.internal.InternalEntity;
 
 /**
  * The LuceneSearchIndexFunction class is a function used to collect the information on a particular
@@ -34,7 +32,7 @@ import org.apache.geode.internal.InternalEntity;
  * @see LuceneIndexInfo
  */
 @SuppressWarnings("unused")
-public class LuceneSearchIndexFunction<K, V> extends FunctionAdapter implements InternalEntity {
+public class LuceneSearchIndexFunction<K, V> implements Function {
 
   protected Cache getCache() {
     return CacheFactory.getAnyInstance();
@@ -58,7 +56,6 @@ public class LuceneSearchIndexFunction<K, V> extends FunctionAdapter implements 
   }
   
   public void execute(final FunctionContext context) {
-//    Set<LuceneSearchResults> result = new HashSet<>();
     final Cache cache = getCache();
     LuceneQueryInfo queryInfo = null;
     Object args = context.getArguments();
@@ -79,7 +76,6 @@ public class LuceneSearchIndexFunction<K, V> extends FunctionAdapter implements 
           .setLimit(queryInfo.getLimit()).create(queryInfo.getIndexName(),
               queryInfo.getRegionPath(), queryInfo.getQueryString(), queryInfo.getDefaultField());
       if (queryInfo.getKeysOnly()) {
-//        query.findKeys().forEach(key -> result.add(new LuceneSearchResults(key.toString())));
         context.getResultSender().lastResult(query.findKeys());
       } else {
         PageableLuceneQueryResults<K, V> pageableLuceneQueryResults = query.findPages();
@@ -87,22 +83,12 @@ public class LuceneSearchIndexFunction<K, V> extends FunctionAdapter implements 
         while (pageableLuceneQueryResults.hasNext()) {
           List<LuceneResultStruct<K, V>> page = pageableLuceneQueryResults.next();
           pageResult.addAll(page);
-//          page.stream()
-//          .forEach(searchResult -> {
-//            result.add(new LuceneSearchResults<K, V>(searchResult.getKey().toString(),
-//                searchResult.getValue().toString(), searchResult.getScore())); 
-//          });
         }
         context.getResultSender().lastResult(pageResult);
       }
-//      if (result != null) {
-//        context.getResultSender().lastResult(result);
-//      }
     } catch (LuceneQueryException e) {
-//      result.add(new LuceneSearchResults(true, e.getRootCause().getMessage()));
       context.getResultSender().lastResult(new LuceneSearchResults(true, e.getRootCause().getMessage()));
     } catch (Exception e) {
-//      result.add(new LuceneSearchResults(true, e.getMessage()));
       context.getResultSender().lastResult(new LuceneSearchResults(true, e.getMessage()));
     }
   }

@@ -1,22 +1,17 @@
 Overview
 ========
-This example try to show as many features of gemfire lucene
-in a light-weight application. 
+This example will show several features of Lucene integration with GemFire.
 
-Following gemfire lucene features are tested:
-
-- create an application using gemfire lucene from scratch.
-- create lucene index from scratch, with or without analyzer
-- create lucene index into cluster configuration and then used by other members
-- create user objects, primitive values(both string and integer), and json objects, put them into gemfire cache and indexed them
-- Query using normal StringQueryParser, which is the main weapon. Lucene syntax is supported.
-- Demonstrate the different query results using analyzers, included a home-baked analyzer
-- Demonstrate query on primitive value and json object. 
-- Demonstrate an example of using QueryProvider to create my own lucene query object. This feature is for advanced lucene users. In this example, it's a Range Query for integer value. The demo provided 3 different way to use QueryProvider. 
-- start a REST server to show the contents
-- REST API to do lucene search (TBD)
-- From a client (or native client) to run lucene query through calling a function execution
-- soundex query
+- Creating a simple data region with Lucene indexes using gfsh commands.
+- Creating a Lucene index specifying a different analyzer per field
+- Create lucene index into cluster configuration and then used by other members
+- Generate data objects and json objects, putting them into gemfire cache with the Lucene indexing creating a co-located region.
+- Query using the default StringQueryParser demonstrating standard Lucene syntax.
+- Demonstrate using QueryProvider to create a custom lucene query object. The example will create a Range Query for integer value. 
+- Start a REST server to show the data region contents
+- Use a REST API (SwaggerUI) to do lucene search by executing a function.
+- Start a REST client to run lucene query through function execution
+- Demonstrate how to import and use the SoundEx analyzer for more advanced phonetic searches.
 
 It can be run standalone, or in a cluster contains server 
 with feeder, server only, client. Both server with feeder 

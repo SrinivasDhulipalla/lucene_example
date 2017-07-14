@@ -10,7 +10,6 @@ public class LuceneSearchResults<K, V> implements Comparable<LuceneSearchResults
   private boolean exceptionFlag = false;
   private String exceptionMessage;
 
-
   public LuceneSearchResults(final String key, final String value, final float score) {
     this.key = key;
     this.value = value;
