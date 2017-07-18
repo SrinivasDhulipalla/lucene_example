@@ -4,51 +4,43 @@ This example will show several features of Lucene integration with GemFire.
 
 - Creating a simple data region with Lucene indexes using gfsh commands.
 - Creating a Lucene index specifying a different analyzer per field
-- Create lucene index into cluster configuration and then used by other members
+- Storing lucene index into cluster configuration and then used by other members
 - Generate data objects and json objects, putting them into gemfire cache with the Lucene indexing creating a co-located region.
 - Query using the default StringQueryParser demonstrating standard Lucene syntax.
-- Demonstrate using QueryProvider to create a custom lucene query object. The example will create a Range Query for integer value. 
+- Demonstrate using QueryProvider to create a custom lucene query object. The example includes a Range Query for comparing integer values. 
 - Start a REST server to show the data region contents
-- Use a REST API (SwaggerUI) to do lucene search by executing a function.
-- Start a REST client to run lucene query through function execution
+- Start a REST client to run lucene query using function execution
 - Demonstrate how to import and use the SoundEx analyzer for more advanced phonetic searches.
 
-It can be run standalone, or in a cluster contains server 
-with feeder, server only, client. Both server with feeder 
-and client will do the same lucene queries.
+This example can be run standalone or by first creating a cluster containing 2 servers, 
+one that also feeds data into the region, and a client. Both the server with the feeder 
+and the client will do the same lucene queries.
 
 REST URL is:
 
 - http://localhost:8081/gemfire-api/docs/index.html (for feeder)
 - http://localhost:8080/gemfire-api/docs/index.html (for server started by gfsh)
 
-The simplest way to run is run a standalone test:
+To run this example standalone:
 
 cd ./lucene_example
 ./gradlew run
 or
 ./gradlew run -PappArgs="[1, false]"
 
-There're following standalone tests:
-1) stand alone server with feeder
+To run different parts of this example:
+1) Run stand alone server that also generates and feeds data into the region
 ./gradlew run -PappArgs="[1, false]"
 
-2) server only (with locator), mainly for testing recovery from disk
+2) Start, stop, then restart the 2nd server to demonstrate recovering index from disk
 ./gradlew run -PappArgs="[2, true]"
 
-3) client
+3) Execute Lucene queries from client
 ./gradlew run -PappArgs="[3]"
 
 4) server with cluster config, need to start a gfsh to create region and index
 ./gradlew run -PappArgs="[4, true]"
 
-5) calculate size: create index and calculate region size
-./gradlew run
-
-6) load user data: load a small csv file with 6 records, do a query
-./gradlew run -PappArgs="[6, false]"
-or
-./gradlew run -PappArgs="[6, false, '/Users/gzhou/git3/geode311demo/bin/311-sample.csv']"
 
 Part-0: preparation
 

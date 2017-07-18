@@ -19,7 +19,7 @@ public class Person implements Serializable {
   public Person(int idx) {
     this.name = createName(idx);
     this.email = "tzhou"+idx+"@example.com";
-    this.address = ""+idx+" Lindon St, Portland_OR_"+(97000+idx);
+    this.address = ""+idx+" Lindon St, Portland OR "+(97000+idx);
     this.revenue = idx*1000;
   }
 

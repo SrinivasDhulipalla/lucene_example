@@ -57,7 +57,8 @@ public class Main {
   Region PersonRegion;
   LuceneService service;
   static int serverPort = 50505;
-  static boolean useLocator = false;
+  static boolean useLocator = false; 
+  
 
   final static int ENTRY_COUNT = 1000;
 
@@ -202,34 +203,33 @@ public class Main {
 
     // create an index using standard analyzer on region /Person
     service.createIndexFactory().setFields("name", "email", "address", "revenue").create("personIndex", "Person");
+    
+    // Create the region after the Lucene indexes have been defined.
     PersonRegion = ((Cache)cache).createRegionFactory(shortcut).create("Person");
   }
 
   public void doQuery() throws LuceneQueryException {
     System.out.println("Regular query on standard analyzer:");
     queryByStringQueryParser("personIndex", "Person", "name:Tom99*", 5);
-    
-    System.out.println("\nUse customized analyzer to tokenize by '_'");
-    queryByStringQueryParser("analyzerIndex", "Person", "address:97763", 0);
-    System.out.println("\nCompare with standard analyzer");
-    queryByStringQueryParser("personIndex", "Person", "address:97763", 0);
 
     System.out.println("\nFuzzy search examples:");
     queryByStringQueryParser("personIndex", "Person", "name:Tom999*", 0);
     queryByStringQueryParser("personIndex", "Person", "name:Tom999~", 0);
-    queryByStringQueryParser("personIndex", "Person", "name:Tom999~0.8", 0);
+    queryByStringQueryParser("personIndex", "Person", "name:Tom999~0.8", 10);
 
-    System.out.println("\nProximity search examples:");
-    queryByStringQueryParser("personIndex", "Person", "address:\"999 Portland_OR_97999\"~1", 0);
-    queryByStringQueryParser("personIndex", "Person", "address:\"999 Portland_OR_97999\"~2", 0);
+    System.out.println("\nProximity search within 1 word of each other:");
+    queryByStringQueryParser("personIndex", "Person", "address:\"999 Portland OR 97999\"~1", 0);
+    
+    System.out.println("\nProximity search within 3 words of each other:");
+    queryByStringQueryParser("personIndex", "Person", "address:\"999 Portland OR 97999\"~3", 0);
 
     System.out.println("\nQuery with composite condition");
-    queryByStringQueryParser("analyzerIndex", "Person", "name:Tom999* OR address:97763", 0);
+    queryByStringQueryParser("personIndex", "Person", "name:Tom999* OR address:97763", 0);
 
-    System.out.println("\nExamples of QueryProvider");
-    queryByIntRange("personIndex", "Person", "revenue", 995, Integer.MAX_VALUE);
+    System.out.println("\nUse custom QueryProvider for integer range query");
+    queryByIntRange("personIndex", "Person", "revenue", 995, 10000);
     
-    System.out.println("Regular query on soundex analyzer: double metaphone");
+    System.out.println("\nQuery using soundex analyzer: double metaphone");
     insertSoundexNames(PersonRegion);
     try {
       waitUntilFlushed("personIndex", "Person");
@@ -239,8 +239,8 @@ public class Main {
       e.printStackTrace();
     }
     queryByStringQueryParser("analyzerIndex", "Person", "name:Stephen", 5);
-    
-    queryByStringQueryParser("analyzerIndex", "Person", "name:Ste*", 5);
+    queryByStringQueryParser("analyzerIndex", "Person", "name:Steve", 5);
+
   }
   
   public void doClientFunction() {
