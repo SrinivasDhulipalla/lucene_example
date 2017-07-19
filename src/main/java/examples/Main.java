@@ -279,7 +279,7 @@ public class Main {
     do {
       status = service.waitUntilFlushed(indexName, regionName, 60000, TimeUnit.MILLISECONDS);
     } while (status == false);
-    System.out.println("wait time after feed is:"+(System.currentTimeMillis() - then));
+    //System.out.println("wait time after feed is:"+(System.currentTimeMillis() - then));
   }
 
   private void feed(int count) {
