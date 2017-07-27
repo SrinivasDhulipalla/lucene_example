@@ -95,6 +95,8 @@ gfsh>create lucene index --name=testIndex --region=testRegion --field=__REGION_V
 ---------------------------------------- | ---------------------------------
 192.168.1.23(server50505:17200)<v1>:1025 | Successfully created lucene index
 
+NOTE: __REGION_VALUE_FIELD is a special keyword that treats the entire entry value as a single field.
+
 gfsh>list lucene indexes --with-stats
 Index Name | Region Path |     Indexed Fields     | Field Analy.. | Status  | Query Executions | Updates | Commits | Documents
 ---------- | ----------- | ---------------------- | ------------- | ------- | ---------------- | ------- | ------- | ---------
@@ -173,8 +175,8 @@ gfsh>exit
 rm -rf locator1 server50505
 
 
-Part-2: Demonstrate Lucene index perserved in cluster configuration
-===================================================================
+Part-2: A more complex example using gfsh cluster configuration
+===============================================================
 
 step 1: Start server in gfsh. Create index, region and save into cluster config
 ------------------------------------------------------------------
@@ -188,13 +190,13 @@ configure pdx --disk-store=DEFAULT --read-serialized=true
 
 start server --name=server50505 --server-port=50505 --locators=localhost[12345] --start-rest-api --http-service-port=8080 --http-service-bind-address=localhost --group=group50505
 
-gfsh>deploy --jar=<$HOME>/lucene_demo/server/lucene_example/build/libs/lucene_example-0.0.1.jar --group=group50505
+NOTE: Modify the following command with the correct path to the lucene_example-0.0.1.jar file
+gfsh>deploy --jar=/Users/gzhou/lucene_demo/server/lucene_example/build/libs/lucene_example-0.0.1.jar --group=group50505
   Member    |       Deployed JAR       | Deployed JAR Location
 ----------- | ------------------------ | -------------------------------------------------------------------------------------
 server50505 | lucene_example-0.0.1.jar | /Users/gzhou/lucene_demo/locator/server50505/vf.gf#lucene_example-0.0.1.jar#1
 
-
-create lucene index --name=analyzerIndex --region=/Person --field=name,email,address,revenue --analyzer=null,org.apache.lucene.analysis.core.KeywordAnalyzer,examples.MyCharacterAnalyzer,null
+create lucene index --name=analyzerIndex --region=/Person --field=name,email,address,revenue --analyzer=DEFAULT,org.apache.lucene.analysis.core.KeywordAnalyzer,DEFAULT,DEFAULT
 create lucene index --name=personIndex --region=/Person --field=name,email,address,revenue
 create region --name=Person --type=PARTITION_REDUNDANT_PERSISTENT
 
@@ -222,8 +224,6 @@ locator1    | 192.168.1.3(locator1:32892:locator)<ec><v0>:1024
 server50505 | 192.168.1.3(server50505:32949)<v1>:1025
 server50509 | 192.168.1.3(server50509:33041)<v6>:1026
 
-#analyzerIndex uses imported SoundEx DoubleMetaphone phonetic analyzer for name field
-
 # query json object
 gfsh>search lucene --name=personIndex --region=/Person --defaultField=name --queryStrings="Tom*JSON"
   key    |                                                                   value                                                                    | score
@@ -234,15 +234,25 @@ jsondoc1 | PDX[3,__GEMFIRE_JSON]{address=PDX[1,__GEMFIRE_JSON]{city=New York, po
 # query with limit
 gfsh>search lucene --name=personIndex --region=/Person --defaultField=name --queryStrings=Tom3* --limit=5
 
+# Use fuzzy search criteria
+gfsh>search lucene --name=personIndex --region=/Person --defaultField=name --queryStrings="Stephen~"
+
+# Try word proximity search
+# NOTE: in gfsh, the search must be surrounded by single 's to capture both the string set and proximity constraint.
+# First search returns no results since 999 is not within 1 word of Portland OR.
+gfsh>search lucene --name=personIndex --region=/Person --defaultField=address --queryStrings='"999 Portland OR"~1'
+gfsh>search lucene --name=personIndex --region=/Person --defaultField=address --queryStrings='"999 Portland OR"~3'
+
 # composite query condition
-gfsh>search lucene --name=personIndex --region=/Person --defaultField=name --queryStrings="Tom36* OR Tom422"
+gfsh>search lucene --name=personIndex --region=/Person --defaultField=name --queryStrings="name:Tom999* OR address:97763"
 
 # query using keyword analyzer, analyzerIndex uses KeywordAnalyzer for field "email"
 gfsh>search lucene --name=analyzerIndex --region=/Person --defaultField=email --queryStrings="email:tzhou490@example.com"
  key   |                                                         value                                                          | score
 ------ | ---------------------------------------------------------------------------------------------------------------------- | -------
 key490 | Person{name='Tom490 Zhou', email='tzhou490@example.com', address='490 Lindon St, Portland_OR_97490', revenue='490000'} | 1.89712
-Note: KeywordAnalyzer produces more accurate results for email: only found key490. Next query demonstrates this.
+
+# Note: KeywordAnalyzer produces more accurate results for email: only found key490. The query below demonstrates the results if the StandardAnalyzer was used.
 
 gfsh>search lucene --name=personIndex --region=/Person --defaultField=email --queryStrings="email:tzhou490@example.com"
  key   |                                                         value                                                          | score
@@ -255,8 +265,7 @@ key614 | Person{name='Tom614 Zhou', email='tzhou614@example.com', address='614 L
 key413 | Person{name='Tom413 Zhou', email='tzhou413@example.com', address='413 Lindon St, Portland_OR_97413', revenue='413000'} | 0.07806893
 key490 | Person{name='Tom490 Zhou', email='tzhou490@example.com', address='490 Lindon St, Portland_OR_97490', revenue='490000'} | 1.7481685
 
-Note: found a lot due to search by "example.com", because personIndex is using standard analyzer for field "email".
-
+# Note: This search found many because the personIndex uses the StandardAnalyzer for "email", which tokenizes email field, returning match for all emails with "@example.com".
 
 step 4: Execute Lucene query from client by executing a function on the server
 ------------------------------------------------------------------------------

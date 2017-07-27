@@ -1,7 +1,8 @@
 package examples;
-
+ 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -105,7 +106,7 @@ public class Main {
           prog.waitUntilFlushed("personIndex", "Person");
           prog.waitUntilFlushed("analyzerIndex", "Person");
 
-          prog.doQuery();
+          //prog.doQuery();
           break;
 
         case SERVER_WITH_FEEDER:
@@ -130,7 +131,7 @@ public class Main {
       }
       
       System.out.println("Press any key to exit");
-      int c = System.in.read();
+      System.in.read();
 
     } finally {
       prog.stopServer();
@@ -164,6 +165,12 @@ public class Main {
         .set("statistic-archive-file", "server1.gfs");
     //        .set("log-level", "debug")
     ;
+
+    if (instanceType != CLIENT) {
+      builder.set("start-dev-rest-api", "true")
+      .set("http-service-port","808"+instanceType)
+      .set("http-service-bind-address", "localhost");
+    }
 
     if (useLocator && instanceType != CLIENT) {
       builder.set("locators", "localhost[12345]");
@@ -248,13 +255,13 @@ public class Main {
     Pool pool = PoolManager.createFactory().addLocator("localhost", 12345).create("clientPool");
 
     LuceneQueryInfo queryInfo = new LuceneQueryInfo("personIndex", "Person", "name:Tom99*", "name", -1, false); 
-    Execution execution = FunctionService.onServer(pool).withArgs(queryInfo);
+    Execution execution = FunctionService.onServer(pool).setArguments(queryInfo);
     // Client code can call function via its name, it does not need to know function class object
     ResultCollector<?,?> rc = execution.execute("LuceneSearchIndexFunction");
     displayResults(rc);
     
     queryInfo = new LuceneQueryInfo("analyzerIndex", "/Person", "address:97763", "name", -1, false);
-    execution = FunctionService.onServer(pool).withArgs(queryInfo);
+    execution = FunctionService.onServer(pool).setArguments(queryInfo);
     rc = execution.execute("LuceneSearchIndexFunction");
     displayResults(rc);
   }
@@ -279,7 +286,7 @@ public class Main {
     do {
       status = service.waitUntilFlushed(indexName, regionName, 60000, TimeUnit.MILLISECONDS);
     } while (status == false);
-    //System.out.println("wait time after feed is:"+(System.currentTimeMillis() - then));
+//    System.out.println("wait time after feed is:"+(System.currentTimeMillis() - then));
   }
 
   private void feed(int count) {
@@ -287,6 +294,7 @@ public class Main {
       PersonRegion.put("key"+i, new Person(i));
     }
     insertAJson(PersonRegion);
+    insertSoundexNames(PersonRegion);
   }
 
   private void insertSoundexNames(Region region) {
