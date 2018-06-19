@@ -295,6 +295,8 @@ public class Main {
     }
     insertAJson(PersonRegion);
     insertSoundexNames(PersonRegion);
+    int total = count + 9;
+    System.out.println("Region "+PersonRegion.getFullPath()+" has "+ total + " entries.");
   }
 
   private void insertSoundexNames(Region region) {
@@ -334,9 +336,9 @@ public class Main {
         + "}";
 
     region.put("jsondoc1", JSONFormatter.fromJSON(jsonPerson1));
-    System.out.println("JSON documents added into Cache: " + jsonPerson1);
-    System.out.println(region.get("jsondoc1"));
-    System.out.println();
+    //System.out.println("JSON documents added into Cache: " + jsonPerson1);
+    //System.out.println(region.get("jsondoc1"));
+    //System.out.println();
 
     String jsonPerson2 = "{"
         + "\"name\": \"Tom99_JSON\","
@@ -363,8 +365,9 @@ public class Main {
         + "]"
         + "}";
     region.put("jsondoc2", JSONFormatter.fromJSON(jsonPerson2));
-    System.out.println("JSON documents added into Cache: " + jsonPerson2);
-    System.out.println(region.get("jsondoc2"));
+    System.out.println("2 JSON documents added into Cache");
+    //System.out.println("JSON documents added into Cache: " + jsonPerson2);
+    //System.out.println(region.get("jsondoc2"));
     System.out.println();
   }
 
